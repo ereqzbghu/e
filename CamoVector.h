@@ -1,0 +1,101 @@
+
+#import <stdlib.h>
+#import <vector>
+
+//#define _SUPPORT_ALIGN
+//#define _SUPPORT_UTF16
+
+//
+enum CamoItemType
+{
+	CamoItemIgnore,
+	CamoItemMethod,
+
+	CamoItemProperty,
+	CamoItemReadOnly,
+	CamoItemSetter,
+	CamoItemGetter,
+	
+	CamoItemProtocol,
+	CamoItemInterface,
+	CamoItemImplementation,
+	
+	CamoItemString,
+	CamoItemNSString,
+};
+
+//
+struct CamoItem
+{
+	CamoItemType type;
+	unsigned length;
+	char payload[];
+};
+
+//
+class CamoVector : public std::vector<CamoItem *>
+{
+public:
+#ifdef _SUPPORT_ALIGN
+	unsigned maxLength;
+
+	//
+	inline CamoVector()
+	{
+		maxLength = 0;
+	}
+#endif
+	
+	//
+	inline ~CamoVector()
+	{
+		for (CamoVector::iterator it = begin(); it != end(); ++it)
+		{
+			free(*it);
+		}
+	}
+	
+public:
+	//
+	CamoItem *PushItem(const char *payload, unsigned length, CamoItemType type = CamoItemIgnore)
+	{
+		if (length == 0)
+		{
+			return NULL;
+		}
+
+		// Skip duplicate
+		for (CamoVector::iterator it = begin(); it != end(); ++it)
+		{
+			CamoItem &item = **it;
+			if ((length == item.length) && !memcmp(payload, item.payload, length))
+			{
+				if (item.type != CamoItemProperty && item.type != CamoItemIgnore)
+				{
+					item.type = type;
+				}
+				return NULL;
+			}
+		}
+		
+		CamoItem *item = (CamoItem *)malloc(sizeof(CamoItem) + length);
+		item->type = type;
+		item->length = length;
+		memcpy(item->payload, payload, length);
+		push_back(item);
+		
+		//
+#ifdef _SUPPORT_ALIGN
+		if (type == CamoItemProperty)
+		{
+			length += 3;
+		}
+		if (maxLength < length)
+		{
+			maxLength = length;
+		}
+#endif
+		
+		return item;
+	}
+};
